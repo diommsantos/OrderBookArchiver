@@ -16,6 +16,7 @@ class OrderBookThread : public QThread
         Q_OBJECT
 
     public:
+        QWebSocket socket;
         OrderBookThread(QObject *parent = nullptr);
         void run() override;
 };
@@ -38,7 +39,6 @@ class OrderBookManager : public QObject
     Q_OBJECT
 
 private:
-    QWebSocket socket;
     QNetworkAccessManager networkManager;
     QString symbol;
     int depth;
@@ -47,7 +47,7 @@ private:
     QQueue<QString> messageQueue;
     QSemaphore hasMessages;
 
-    OrderBookThread thread;
+    OrderBookThread *thread;
     friend void OrderBookThread::run();
 
     void messageHandler(const QString &message);
@@ -57,9 +57,12 @@ private:
 
 public:
     OrderBookManager(QString symbol, int depth = 5000, int updateSpeed = 100);
-    //~OrderBookManager();
-    void start();
-    void stop();
+    ~OrderBookManager() = default;
+    bool start();
+    bool stop();
+    void setSymbol(QString symbol);
+    void setDepth(int depth);
+    void setUpdateSpeed(int updateSpeed);
 
 signals:
     void messageReceived();

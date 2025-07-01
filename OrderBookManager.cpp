@@ -8,26 +8,31 @@
 #include <QUrl>
 #include <QEventLoop>
 
-OrderBookThread::OrderBookThread(QObject *parent) : QThread(parent) {}
+OrderBookThread::OrderBookThread(QObject *parent) : QThread(parent) {
+    socket.moveToThread(this);
+    QObject::connect(this, &OrderBookThread::finished, [this](){
+        socket.close();
+        socket.moveToThread(this->parent()->thread());
+    });
+}
 
 void OrderBookThread::run()
 {   
     OrderBookManager *obm = static_cast<OrderBookManager *>(parent());
-    obm->socket.open(QUrl("wss://stream.binance.com:9443/ws/" + obm->symbol.toLower() + "@depth" +
+    socket.open(QUrl("wss://stream.binance.com:9443/ws/" + obm->symbol.toLower() + "@depth" +
         (obm->updateSpeed == 100 ? "@100ms" : "")));
     exec();
 
 }
 
 OrderBookManager::OrderBookManager(QString symbol, int depth, int updateSpeed) :
-thread(this),
+thread(new OrderBookThread(this)),
 networkManager(this), 
 symbol{symbol},
 updateSpeed{updateSpeed},
 depth{depth}
 {
-    socket.moveToThread(&thread);
-    QObject::connect(&socket, &QWebSocket::textMessageReceived, this, &OrderBookManager::messageHandler, Qt::DirectConnection);
+    QObject::connect(&(thread->socket), &QWebSocket::textMessageReceived, this, &OrderBookManager::messageHandler, Qt::DirectConnection);
 
 }
 
@@ -94,9 +99,9 @@ std::list<Order> OrderBookManager::fromJsonArray(QJsonArray arr)
     return v;
 }
 
-void OrderBookManager::start()
+bool OrderBookManager::start()
 {   
-    thread.start();
+    thread->start();
 
     hasMessages.acquire();
     QJsonDocument jsonOrderBook = QJsonDocument::fromJson(messageQueue.head().toUtf8()); hasMessages.release();
@@ -119,23 +124,29 @@ void OrderBookManager::start()
     orderBook.lastUpdateId = jsonOrderBook["lastUpdateId"].toInteger();
     for(int i = 0; i < messageQueue.size(); i++){
         QJsonDocument json = QJsonDocument::fromJson(messageQueue[i].toUtf8());
-        if(json["u"].toInteger() <= orderBook.lastUpdateId)
+        if(json["u"].toInteger() <= orderBook.lastUpdateId){
             messageQueue.removeAt(i); i--; hasMessages.acquire();
+        }
     }
     
     orderBook.asks = fromJsonArray(jsonOrderBook["asks"].toArray());
     orderBook.bids = fromJsonArray(jsonOrderBook["bids"].toArray());
 
     QObject::connect(this, &OrderBookManager::messageReceived, this, &OrderBookManager::updateOrderBook, Qt::QueuedConnection);
-    
+    return true;
 }
 
-void OrderBookManager::stop()
+bool OrderBookManager::stop()
 {   
-    thread.quit();
-    thread.wait();
+    thread->quit();
+    thread->wait();
+    delete thread;
+    thread = new OrderBookThread(this);
+    QObject::connect(&(thread->socket), &QWebSocket::textMessageReceived, this, &OrderBookManager::messageHandler, Qt::DirectConnection);
     hasMessages.acquire(hasMessages.available());
+    QObject::disconnect(&networkManager, nullptr, nullptr, nullptr);
     QObject::disconnect(this, &OrderBookManager::messageReceived, this, &OrderBookManager::updateOrderBook);
+    return true;
 }
 
 void OrderBookManager::messageHandler(const QString &message)
@@ -146,4 +157,16 @@ void OrderBookManager::messageHandler(const QString &message)
     emit messageReceived();
     qDebug() << "Message received!";
     
+}
+
+void OrderBookManager::setSymbol(QString symbol){
+    this->symbol = symbol;
+}
+
+void OrderBookManager::setDepth(int depth){
+    this->depth = depth;
+}
+
+void OrderBookManager::setUpdateSpeed(int updateSpeed){
+    this->updateSpeed = updateSpeed;
 }

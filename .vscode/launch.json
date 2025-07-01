@@ -14,7 +14,8 @@
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "visualizerFile": "C:/Users/Diogo/.vscode/extensions/theqtcompany.qt-cpp-1.4.0/res/natvis/qt6.natvis.xml"
         },
     ]
 }

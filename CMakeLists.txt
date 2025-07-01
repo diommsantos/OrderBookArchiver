@@ -8,16 +8,28 @@ set(CMAKE_PREFIX_PATH "C:/Qt/6.9.0/msvc2022_64")
 
 find_package(Qt6 REQUIRED COMPONENTS 
     Core
-    WebSockets)
+    WebSockets
+    Gui
+    Widgets
+)
     
 qt_standard_project_setup(REQUIRES 6.5)
 
 qt_add_executable(OrderBookArchiver
     main.cpp
     OrderBookManager.cpp
+    OrderBookWriter.cpp
+    MainWindow.cpp
 )
 
 target_link_libraries(OrderBookArchiver PRIVATE 
     Qt6::Core
     Qt6::WebSockets
+    Qt6::Gui
+    Qt6::Widgets
 )
+
+if(MSVC)
+    add_custom_command(TARGET OrderBookArchiver POST_BUILD 
+                       COMMAND ${WINDEPLOYQT_EXECUTABLE} --no-compiler-runtime --no-translations --no-opengl-sw --force $<TARGET_FILE:OrderBookArchiver> --list relative VERBATIM)
+endif()

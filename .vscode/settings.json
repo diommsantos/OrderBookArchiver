@@ -1,0 +1,9 @@
+{
+    "cSpell.words": [
+        "Archiver"
+    ],
+    "files.associations": {
+        "iosfwd": "cpp",
+        "xlocbuf": "cpp"
+    }
+}
