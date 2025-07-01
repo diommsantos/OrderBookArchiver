@@ -3,12 +3,10 @@
 
 OrderBookWriter::OrderBookWriter(OrderBookManager *manager, QString file, int depth) : 
 manager{manager},
-file{file},
-out{&file},
 depth{depth}
 {
-    out.setDevice(&(this->file));
     connect(manager, &OrderBookManager::orderBookUpdated, this, &OrderBookWriter::write);
+    setFile(file);
 };
 
 int OrderBookWriter::getDepth(){
@@ -34,6 +32,7 @@ const QFile &OrderBookWriter::getFile(){
 
 void OrderBookWriter::setFile(QString file){
     this->file.setFileName(file);
+    this->file.open(QIODevice::WriteOnly);
     out.setDevice(&(this->file));
 };
 
